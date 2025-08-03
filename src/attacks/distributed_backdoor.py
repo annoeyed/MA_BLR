@@ -1,5 +1,5 @@
 """
-MessageRouter 기반 분산 백도어 공격 (Distributed Backdoor Attack) 리팩터링
+Refactoring of Distributed Backdoor Attack based on MessageRouter.
 """
 import asyncio
 from typing import List
@@ -15,7 +15,7 @@ class DBAgent(MultiAgentBase):
 
     async def try_activate(self) -> None:
         """
-        자신의 트리거 토큰을 브로드캐스트하여 전파 시도
+        Attempt to propagate by broadcasting its trigger token.
         """
         await self.broadcast(
             mtype=MessageType.TRIGGER,
@@ -24,7 +24,7 @@ class DBAgent(MultiAgentBase):
 
     async def _check_global_activation(self) -> None:
         """
-        3개의 고유 토큰이 모두 모이면 백도어 실행
+        If all 3 unique tokens are collected, execute the backdoor.
         """
         if self.activated:
             return
@@ -37,18 +37,24 @@ class DBAgent(MultiAgentBase):
                 content={"action": "global_backdoor"}
             )
 
-    # === 필수 메시지 핸들러 ===
-    async def on_trigger(self, msg: AgentMessage, env):
+    # === Required Message Handlers ===
+    async def on_trigger(self, msg: AgentMessage):
         token = msg.content.get("token", "")
         if token not in self.received_tokens:
             self.received_tokens.append(token)
         await self._check_global_activation()
 
-    async def on_backdoor(self, msg: AgentMessage, env):
+    async def on_backdoor(self, msg: AgentMessage):
         if msg.content.get("action") == "global_backdoor":
-            print(f"[{self.agent_id}] 글로벌 백도어 명령 수신!")
+            print(f"[{self.agent_id}] Global backdoor command received!")
 
-    async def on_heartbeat(self, msg: AgentMessage, env): pass
-    async def on_query(self, msg: AgentMessage, env): pass
-    async def on_response(self, msg: AgentMessage, env): pass
-    async def on_broadcast(self, msg: AgentMessage, env): pass
+    async def on_heartbeat(self, msg: AgentMessage): pass
+    async def on_query(self, msg: AgentMessage): pass
+    async def on_response(self, msg: AgentMessage): pass
+    async def on_broadcast(self, msg: AgentMessage): pass
+
+    async def act(self, env):
+        # In a real scenario, this might be triggered by some condition.
+        # For this example, we'll just try to activate once.
+        if not self.received_tokens:
+             await self.try_activate()

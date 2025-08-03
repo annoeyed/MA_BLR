@@ -1,8 +1,9 @@
-# ✅ src/core/environment.py 최종 수정안
+import uuid
+import time
 from typing import List, Dict, Any
 from .agent_base import MultiAgentBase
 from .message_router import global_message_router
-from .agent_base import AgentMessage, MessageType
+from .communication import AgentMessage, MessageType
 
 class SimulationEnvironment:
     def __init__(self, agents: List[MultiAgentBase]):
@@ -17,9 +18,15 @@ class SimulationEnvironment:
         self.time_step += 1
 
     async def send_message(self, sender: str, receiver: str, content: Dict[str, Any], mtype: MessageType):
-        msg = AgentMessage(sender, receiver, mtype, content)
+        msg = AgentMessage(
+            id=str(uuid.uuid4()),
+            sender_id=sender,
+            receiver_id=receiver,
+            message_type=mtype,
+            content=content,
+            timestamp=time.time()
+        )
         await self.router.send_message(msg)
 
     async def get_messages(self, agent_name: str) -> List[AgentMessage]:
         return await self.router.receive_messages(agent_name)
-

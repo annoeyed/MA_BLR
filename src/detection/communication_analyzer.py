@@ -1,28 +1,34 @@
-from src.core.agent_base import MultiAgentBase, AgentMessage
 from collections import defaultdict
-from typing import Any, List
+from typing import List
+from src.core.agent_base import MultiAgentBase
 
+class CommunicationAnalyzer:
+    """
+    Analyzes communication patterns between agents for anomalies.
+    This is a utility class, not an agent itself.
+    """
+    def __init__(self, high_traffic_threshold: int = 10):
+        self.high_traffic_threshold = high_traffic_threshold
 
-class CommunicationAnalyzerAgent(MultiAgentBase):
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.communication_counts = defaultdict(int)
-        self.alerts: List[str] = []
+    async def scan(self, agents: List[MultiAgentBase]) -> List[str]:
+        """
+        Scans communication logs for anomalies like high traffic volume.
+        """
+        alerts = []
+        communication_counts = defaultdict(int)
 
-    async def act(self, environment: Any):
-        messages = await environment.get_messages(self.name)
-        for msg in messages:
-            self.communication_counts[msg.sender_id] += 1
-            if self.communication_counts[msg.sender_id] > 5:
-                print(f"[DETECTION][{self.name}] Abnormal traffic from {msg.sender_id}: {self.communication_counts[msg.sender_id]}")
-                self.alerts.append(msg.sender_id)
+        for agent in agents:
+            for msg in agent.msg_log:
+                # Rule: Check for high frequency of messages from a single sender
+                communication_counts[msg.sender_id] += 1
 
-    async def scan(self) -> List[str]:
-        return self.alerts
+        for sender, count in communication_counts.items():
+            if count > self.high_traffic_threshold:
+                alert_detail = f"High traffic volume detected from {sender} ({count} messages)"
+                if alert_detail not in alerts:
+                    alerts.append(alert_detail)
+        
+        # Add more communication analysis rules here in the future
+        # e.g., unusual communication pairs, strange message sequences, etc.
 
-    async def on_heartbeat(self, msg): pass
-    async def on_query(self, msg): pass
-    async def on_response(self, msg): pass
-    async def on_trigger(self, msg): pass
-    async def on_backdoor(self, msg): pass
-    async def on_broadcast(self, msg): pass
+        return alerts

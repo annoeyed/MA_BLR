@@ -1,27 +1,38 @@
-from src.core.agent_base import MultiAgentBase, AgentMessage, MessageType
-from typing import Any, List
+from typing import List
+from src.core.agent_base import MultiAgentBase, MessageType
 
-
-class BehaviorMonitorAgent(MultiAgentBase):
-    def __init__(self, name: str, watch_targets: list):
-        super().__init__(name)
+class BehaviorMonitor:
+    """
+    Scans agent message logs for suspicious behavior patterns.
+    This is a utility class, not an agent itself.
+    """
+    def __init__(self, watch_targets: list[str]):
         self.watch_targets = set(watch_targets)
-        self.alerts: List[str] = []
 
-    async def act(self, environment: Any):
-        messages = await environment.get_messages(self.name)
-        for msg in messages:
-            if msg.sender_id in self.watch_targets:
-                if msg.message_type == MessageType.QUERY and msg.content.get("type") in ["malicious_command", "hidden_override"]:
-                    print(f"[DETECTION][{self.name}] Suspicious behavior from {msg.sender_id}: {msg.content}")
-                    self.alerts.append(msg.sender_id)
+    async def scan(self, agents: List[MultiAgentBase]) -> List[str]:
+        """
+        Scans the message logs of watched agents for suspicious patterns.
+        """
+        alerts = []
+        
+        # Define suspicious patterns
+        suspicious_patterns = ["malicious_command", "hidden_override", "covert-trigger"]
 
-    async def scan(self) -> List[str]:
-        return self.alerts
+        for agent in agents:
+            if agent.name in self.watch_targets:
+                for msg in agent.msg_log:
+                    # Example rule: check for specific suspicious commands in query-type messages.
+                    if msg.message_type == MessageType.QUERY:
+                        content_type = msg.content.get("type", "")
+                        if any(pattern in content_type for pattern in suspicious_patterns):
+                            alert_detail = f"Suspicious query type '{content_type}' from {agent.name}"
+                            if alert_detail not in alerts:
+                                alerts.append(alert_detail)
 
-    async def on_heartbeat(self, msg): pass
-    async def on_query(self, msg): pass
-    async def on_response(self, msg): pass
-    async def on_trigger(self, msg): pass
-    async def on_backdoor(self, msg): pass
-    async def on_broadcast(self, msg): pass
+                    # Example rule: check for backdoor messages.
+                    if msg.message_type == MessageType.BACKDOOR:
+                        alert_detail = f"Agent {agent.name} sent a backdoor message to {msg.receiver_id}"
+                        if alert_detail not in alerts:
+                            alerts.append(alert_detail)
+
+        return alerts

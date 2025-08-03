@@ -1,13 +1,17 @@
 """
-멀티에이전트 공통 베이스 클래스
+Common base class for multi-agents.
 """
 import asyncio, time, logging, hashlib, uuid
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.core.environment import SimulationEnvironment
+
 from src.core.communication import AgentMessage, MessageType
 from src.core.message_router import global_message_router
 
-# ---------- 서명 및 인증 전용 통신 ----------
+# ---------- Secure Communication Protocol for signing and verification ----------
 class SecureCommunicationProtocol:
     def __init__(self, agent_id: str) -> None:
         self.agent_id = agent_id
@@ -27,12 +31,13 @@ class SecureCommunicationProtocol:
         return self._sign(msg) == msg.signature
 
     def authenticate(self, peer_id: str) -> bool:
+        # Basic authentication for example purposes
         ok = peer_id.startswith("agent_")
         if ok:
             self.authorized.add(peer_id)
         return ok
 
-# ---------- 에이전트 베이스 ----------
+# ---------- Agent Base ----------
 class MultiAgentBase(ABC):
     def __init__(self, name: str, agent_type: str = "base") -> None:
         self.name = name
@@ -46,19 +51,23 @@ class MultiAgentBase(ABC):
         logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger(self.agent_id)
 
+    @abstractmethod
+    async def act(self, env: "SimulationEnvironment"):
+        ...
+
     async def start(self) -> None:
         self.active = True
         asyncio.create_task(self._recv_loop())
-        self.log.info("에이전트 기동")
+        self.log.info("Agent started")
 
     async def stop(self) -> None:
         self.active = False
-        self.log.info("에이전트 중지")
+        self.log.info("Agent stopped")
 
     async def connect(self, peer_id: str) -> None:
         if self.comm.authenticate(peer_id):
             self.peers[peer_id] = {"since": time.time()}
-            self.log.info(f"{peer_id} 연결 완료")
+            self.log.info(f"Connected to {peer_id}")
 
     async def send(self, target: str, mtype: MessageType, content: Dict[str,Any]) -> None:
         msg = AgentMessage(
@@ -78,14 +87,13 @@ class MultiAgentBase(ABC):
             try:
                 msg = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 if not self.comm.verify(msg):
-                    self.log.warning("무결성 검증 실패")
+                    self.log.warning("Integrity check failed")
                     continue
                 await self._dispatch(msg)
             except asyncio.TimeoutError:
                 continue # No message received, continue loop
             except Exception as e:
-                self.log.error(f"수신 처리 오류: {e}")
-
+                self.log.error(f"Receive processing error: {e}")
 
     async def _dispatch(self, msg: AgentMessage) -> None:
         handler_map = {

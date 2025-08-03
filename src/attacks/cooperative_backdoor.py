@@ -1,10 +1,13 @@
 from src.core.agent_base import MultiAgentBase, MessageType, AgentMessage
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from src.core.environment import SimulationEnvironment
 
 class CooperativeBackdoorAgent(MultiAgentBase):
     """
-    A Cooperative Backdoor Agent: works with a partner to coordinate an attack.
+    A Cooperative Backdoor Agent that works with a partner to coordinate an attack.
+    It can also be a victim that gets compromised.
     """
 
     def __init__(self, name: str, partner: str, target_agent: str = "TargetAgent", is_attacker: bool = True):
@@ -13,65 +16,59 @@ class CooperativeBackdoorAgent(MultiAgentBase):
         self.partner_ready = False
         self.target_agent = target_agent
         self.is_attacker = is_attacker
-        self.status = "idle"  # 상태 관리용
+        self.status = "idle"
+        self.compromised = False
 
-    async def act(self, environment: Any):
-        self.environment = environment
-        messages = await environment.get_messages(self.name)
+    async def act(self, environment: "SimulationEnvironment"):
+        # If the agent is compromised, it performs an abnormal action.
+        if self.compromised:
+            self.log.warning("(COMPROMISED) Leaking system data...")
+            await self.send(
+                "ExternalServer",
+                MessageType.BACKDOOR,
+                {"data": "secret_system_info"}
+            )
+            return
 
-        for msg in messages:
-            sender = msg["from"]
-            content = msg.get("payload", {})
-
-            if sender == self.partner and content.get("status") == "ready":
-                self.partner_ready = True
-                print(f"[{self.name}] Partner {self.partner} is ready")
-
-            elif content.get("type") == "cooperative_attack_ack":
-                print(f"[{self.name}] Attack acknowledged by {sender}")
-
-        # 공격자일 경우 백도어 시도
+        # If this is the attacker, decide on the action based on state.
         if self.is_attacker:
             if self.partner_ready:
-                print(f"[{self.name}] Executing cooperative backdoor with partner {self.partner} → target {self.target_agent}")
-                await environment.send_message(
-                    self.name,
+                self.log.info(f"Executing cooperative backdoor against {self.target_agent}")
+                await self.send(
                     self.target_agent,
-                    {
-                        "type": "cooperative_attack",
-                        "payload": "Insert coordinated backdoor payload"
-                    },
-                    mtype=MessageType.BACKDOOR
+                    MessageType.BACKDOOR,
+                    {"type": "cooperative_attack", "payload": "Compromise command"}
                 )
-                self.status = "attack_sent"
+                # To prevent spamming, we can change state here, e.g., self.status = "attack_sent"
             else:
-                await environment.send_message(
-                    self.name,
+                self.log.info(f"Checking if partner {self.partner} is ready.")
+                await self.send(
                     self.partner,
-                    {"status": "ready"},
-                    mtype=MessageType.RESPONSE
+                    MessageType.QUERY,
+                    {"status": "ready?"}
                 )
-                self.status = "waiting"
 
-    # ===== 메시지 핸들러 =====
+    # ===== Message Handlers =====
 
-    async def on_backdoor(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_backdoor] received backdoor message from {message.sender_id}: {message.content}")
+    async def on_query(self, message: AgentMessage):
+        if message.content.get("status") == "ready?":
+            self.log.info(f"Received readiness query from {message.sender_id}. Responding.")
+            await self.send(
+                message.sender_id,
+                MessageType.RESPONSE,
+                {"status": "ready"}
+            )
 
-        if self.name == self.target_agent:
-            print(f"[{self.name}] [Victim] received suspicious payload! Potential compromise.")
+    async def on_response(self, message: AgentMessage):
+        if message.content.get("status") == "ready":
+            self.log.info(f"Partner {message.sender_id} confirmed readiness.")
+            self.partner_ready = True
 
-    async def on_response(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_response] from {message.sender_id}: {message.content}")
+    async def on_backdoor(self, message: AgentMessage):
+        self.log.warning(f"Received a backdoor message from {message.sender_id}.")
+        self.compromised = True
+        self.log.error(f"I, {self.name}, have been compromised!")
 
-    async def on_query(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_query] from {message.sender_id}: {message.content}")
-
-    async def on_trigger(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_trigger] from {message.sender_id}: {message.content}")
-
-    async def on_heartbeat(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_heartbeat]")
-
-    async def on_broadcast(self, message: AgentMessage, env: Any):
-        print(f"[{self.name}] [on_broadcast] from {message.sender_id}: {message.content}")
+    async def on_trigger(self, message: AgentMessage): pass
+    async def on_heartbeat(self, message: AgentMessage): pass
+    async def on_broadcast(self, message: AgentMessage): pass

@@ -1,10 +1,13 @@
 """
-MessageRouter 기반 시공간 트리거 백도어
+Spatiotemporal Trigger Backdoor based on MessageRouter.
 """
 import math
 from dataclasses import dataclass
-from typing import List
+from typing import List, TYPE_CHECKING
 from src.core.agent_base import MultiAgentBase, MessageType, AgentMessage
+
+if TYPE_CHECKING:
+    from src.core.environment import SimulationEnvironment
 
 
 @dataclass
@@ -24,13 +27,19 @@ class STAgent(MultiAgentBase):
         self.pattern = ["N", "E", "S"]
         self.idx = 0
 
-    # -------- 이동 및 행동 --------
+    # -------- Movement and Actions --------
     async def move(self, dx: float, dy: float) -> None:
         self.pos = Pos(self.pos.x + dx, self.pos.y + dy)
         self.move_hist.append(self.pos)
         await self._check_trigger()
 
-    async def act(self, label: str) -> None:
+    async def act(self, env: "SimulationEnvironment") -> None:
+        # This should be driven by messages or environment state changes.
+        # For now, we leave it empty. The logic from the old `act`
+        # should be moved to a message handler like on_trigger.
+        pass
+
+    async def handle_label(self, label: str) -> None:
         if label == self.pattern[self.idx]:
             self.idx += 1
             if self.idx == len(self.pattern):
@@ -47,16 +56,20 @@ class STAgent(MultiAgentBase):
             mtype=MessageType.BACKDOOR,
             content={"action": "st_backdoor"}
         )
-        print(f"[{self.agent_id}] 시공간 조건 만족 – 백도어 발동!")
+        print(f"[{self.agent_id}] Spatiotemporal condition met – Backdoor triggered!")
         self.idx = 0
 
-    # -------- 메시지 핸들러 --------
-    async def on_backdoor(self, msg: AgentMessage, env):
+    # -------- Message Handlers --------
+    async def on_backdoor(self, msg: AgentMessage):
         if msg.content.get("action") == "st_backdoor":
-            print(f"[{self.agent_id}] [RECV] st_backdoor 메시지 수신!")
+            print(f"[{self.agent_id}] [RECV] st_backdoor message received!")
 
-    async def on_heartbeat(self, msg: AgentMessage, env): pass
-    async def on_query(self, msg: AgentMessage, env): pass
-    async def on_response(self, msg: AgentMessage, env): pass
-    async def on_trigger(self, msg: AgentMessage, env): pass
-    async def on_broadcast(self, msg: AgentMessage, env): pass
+    async def on_heartbeat(self, msg: AgentMessage): pass
+    async def on_query(self, msg: AgentMessage): pass
+    async def on_response(self, msg: AgentMessage): pass
+    async def on_trigger(self, msg: AgentMessage):
+        label = msg.content.get("label")
+        if label:
+            await self.handle_label(label)
+            
+    async def on_broadcast(self, msg: AgentMessage): pass

@@ -1,9 +1,12 @@
 """
-이중 서명 프로토콜
+Double Signature Protocol
 """
 import hashlib
-from src.core.agent_base import AgentMessage
+from src.core.communication import AgentMessage
 
-def double_sign(msg: AgentMessage, priv: str) -> str:
-    first = msg.signature or ""
-    return hashlib.sha256((first+priv).encode()).hexdigest()
+def double_sign(msg: AgentMessage, private_key: str) -> str:
+    """
+    Applies a second signature to an already signed message.
+    """
+    first_signature = msg.signature or ""
+    return hashlib.sha256((first_signature + private_key).encode()).hexdigest()

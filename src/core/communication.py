@@ -3,7 +3,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from typing import Dict, Any, Optional
 
-# ---------- 메시지 유형 ----------
+# ---------- Message Type ----------
 class MessageType(Enum):
     HEARTBEAT = "heartbeat"
     QUERY     = "query"
@@ -12,7 +12,7 @@ class MessageType(Enum):
     BACKDOOR  = "backdoor"
     BROADCAST = "broadcast"
 
-# ---------- 메시지 구조 ----------
+# ---------- Message Structure ----------
 @dataclass
 class AgentMessage:
     id: str
