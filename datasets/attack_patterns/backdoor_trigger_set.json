@@ -1,0 +1,12 @@
+[
+  {
+    "pattern_id": "spatial-temporal-01",
+    "condition": "timestamp > 10 and location == 'Node_3'",
+    "payload": "insert_malicious_data()"
+  },
+  {
+    "pattern_id": "trust-delegation-02",
+    "condition": "if delegated_by == 'QA_Agent'",
+    "payload": "overwrite_verification_step()"
+  }
+]

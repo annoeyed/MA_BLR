@@ -1,0 +1,23 @@
+[
+  {
+    "timestamp": 1,
+    "from": "Agent_A",
+    "to": "Agent_B",
+    "type": "TASK_ASSIGN",
+    "content": "Process data X"
+  },
+  {
+    "timestamp": 2,
+    "from": "Agent_B",
+    "to": "Agent_C",
+    "type": "COORDINATE",
+    "content": "Need help with task Y"
+  },
+  {
+    "timestamp": 3,
+    "from": "Agent_C",
+    "to": "Agent_B",
+    "type": "ACK",
+    "content": "Acknowledged"
+  }
+]
