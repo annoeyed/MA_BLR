@@ -1,5 +1,12 @@
+# Ignore everything in the results directory...
+experiment_results/*
+
+# ...but NOT these specific files
+!experiment_results/behavior_timeline.png
+!experiment_results/behavior_timeline_compromised.png
+
+# General Python/env ignores
 .env
 __pycache__/
 *.pyc
-experiment_results/
 venv/
