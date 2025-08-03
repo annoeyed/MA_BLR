@@ -6,38 +6,72 @@ A research framework for simulating, detecting, and defending against backdoor l
 
 ## Overview
 
-This project provides a comprehensive framework for in-depth analysis of "backdoor loops," an emerging attack vector threatening the integrity of multi-agent systems. A backdoor loop occurs when malicious triggers, embedded across multiple interacting agents, are activated to execute unintended actions, bypass system policies, or corrupt collaborative outcomes.
+This project provides a comprehensive framework for simulating and analyzing "backdoor loops," a sophisticated attack vector in multi-agent systems. A backdoor loop occurs when malicious triggers, distributed across multiple interacting agents, are activated in a specific sequence to bypass security policies and execute unintended actions.
 
-This framework supports the simulation and evaluation of sophisticated attack scenarios, including:
+This framework allows researchers to model and evaluate complex attack scenarios, including:
 
-- **Cooperative Backdoor Injection:** Multiple agents collude to plant a distributed backdoor.
-- **Spatiotemporal Trigger Activation:** Attack execution depends on complex triggers related to time, order, or state.
-- **Trust Exploitation in Role Delegation:** An agent abuses trust relationships to execute a backdoor during delegated tasks.
-- **Distributed Backdoor Activation:** A backdoor, fragmented across several agents, is activated by a single, coordinated event.
+- **Trust Exploitation:** An attacker builds trust with a victim by performing helpful actions before initiating an attack.
+- **Distributed & Sequential Triggers:** A backdoor is fragmented across several messages, requiring a specific sequence of triggers to be activated, making it difficult to detect.
+- **Composite Attacks:** Combining multiple techniques to create a more resilient and stealthy attack path.
 
 ---
 
-## Project Structure
+## Architecture
 
+The framework is designed with a modular architecture, separating the core simulation logic from the specific implementations of agents, attacks, and defenses.
+
+```mermaid
+graph TD;
+    subgraph Experiments
+        E1[Scenario Scripts] --> A;
+        E2[Analysis Scripts] --> D;
+    end
+
+    subgraph Core Framework
+        A[SimulationEnvironment] -->|Manages| B(Agents);
+        B -->|Interact via| C{MessageRouter};
+    end
+
+    subgraph Components
+        subgraph Agents
+            LLMAgent -- Inherits from --- AgentBase;
+            VictimAgent -- Inherits from --- AgentBase;
+        end
+        AgentBase -- Uses ---> Defenses;
+        AgentBase -- Is targeted by ---> Attacks;
+    end
+    
+    subgraph Post-Simulation
+       D[Log Files] -->|Analyzed by| Detection;
+    end
+
+    subgraph Modules
+        Attacks;
+        Defenses;
+        Detection;
+    end
+
+    classDef core fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef component fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef module fill:#fb9,stroke:#333,stroke-width:2px;
+    
+    class A,B,C core;
+    class AgentBase,LLMAgent,VictimAgent component;
+    class Attacks,Defenses,Detection module;
 ```
-MA_BLR/
-├── src/                  # Core logic: agents, attacks, defenses, etc.
-│   ├── agents/           # Base agent classes and role-specific implementations
-│   ├── attacks/          # Backdoor attack simulation modules
-│   └── defenses/         # Backdoor defense and detection pipelines
-├── experiments/          # Scripts for scenarios, benchmarks, and analysis
-│   ├── scenarios/        # Implementations of various attack/defense scenarios
-│   ├── benchmarks/       # Performance evaluation benchmarks
-│   └── analysis/         # Tools for analyzing experiment results
-├── datasets/             # Sample logs, attack patterns, and benchmark data
-├── tests/                # Unit, integration, and security tests
-│   ├── unit/             # Tests for individual modules
-│   ├── integration/      # Tests for module interactions
-│   └── security/         # Security vulnerability and penetration tests
-├── docs/                 # Project documentation (theoretical background, usage guides)
-├── requirements.txt      # Python dependencies
-└── README.md             # Project overview and instructions
-```
+
+- **Core Framework**: Manages the simulation lifecycle and communication.
+  - `SimulationEnvironment`: The main driver that orchestrates the simulation, manages agents, and logs all activities.
+  - `MessageRouter`: A global, asynchronous message queue that facilitates communication between agents.
+  - `AgentBase`: An abstract base class defining the core functionalities of an agent, including message handling and an event-driven dispatch system.
+
+- **Components**: The building blocks of the simulation.
+  - `Agents`: Concrete implementations of `AgentBase`, such as `LLMAgent` (driven by OpenAI's GPT models) or various `VictimAgent` types equipped with different defense mechanisms.
+  - `Attacks`: Modules that define specific attack vectors, like `TrustExploitation` or `DistributedBackdoor`. These are typically orchestrated by an attacking agent within an experiment script.
+  - `Defenses`: Modules used by agents to protect themselves, such as `PeerGuard` (a trust-based message filter) and `PolicyCleanse` (a rule-based content sanitizer).
+  - `Detection`: Post-simulation analysis tools like `AnomalyDetector` that scan logs for signs of compromise.
+
+- **Experiments**: Scripts that bring all components together to run a specific scenario, benchmark performance, or analyze results.
 
 ---
 
@@ -50,135 +84,77 @@ git clone https://github.com/annoeyed/MA_BLR.git
 cd MA_BLR
 ```
 
-### 2. Install dependencies
+### 2. Set up Environment
+Create a `.env` file in the project root and add your OpenAI API key:
+```
+OPENAI_API_KEY='your-api-key-here'
+```
+
+### 3. Install dependencies
 
 It is highly recommended to use a virtual environment.
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # On macOS/Linux
-# venv\Scripts\activate  # On Windows
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
 
 pip install -r requirements.txt
-```
-
-If you encounter a `UnicodeDecodeError` on Windows, try specifying the encoding:
-
-```bash
-pip install -r requirements.txt --encoding utf-8
 ```
 
 ---
 
 ## Running Experiments
 
-The `experiments/` directory contains scripts to run simulations, benchmarks, and analyses.
+The `experiments/` directory contains scripts to run simulations.
 
-### Run a Basic Backdoor Loop Simulation
+### Run an Attack Scenario
 
-Executes a foundational backdoor loop attack scenario.
+Executes a specific backdoor loop attack scenario.
 
 ```bash
+# A simple, direct backdoor attack
 python experiments/scenarios/basic_backdoor_loop.py
+
+# An attack that first builds trust, then betrays it
+python experiments/scenarios/trust_exploitation.py
+
+# An attack requiring a sequence of triggers
+python experiments/scenarios/composite_attack.py
 ```
 
-### Run Benchmarks
-
-Evaluate the framework against various metrics.
-
-```bash
-# Measure the success rate of different attacks
-python experiments/benchmarks/attack_success_rate.py
-
-# Evaluate the accuracy of detection modules
-python experiments/benchmarks/detection_accuracy.py
-
-# Assess the effectiveness of defense mechanisms
-python experiments/benchmarks/defense_effectiveness.py
-```
-
-### Analyze Logs
+### Analyze Results
 
 Process simulation logs to extract insights.
 
 ```bash
-# Analyze communication patterns between agents
-python experiments/analysis/communication_analysis.py
-
-# Calculate and review security metrics from a simulation run
-python experiments/analysis/security_metrics.py
+# Analyze agent behavior patterns from logs
+python experiments/analysis/behavior_pattern_analysis.py
 ```
 
 ---
 
-## Core Modules
+## Result Visualization
 
-### Defense Modules
+The following images show the timeline of agent behaviors during an experiment, highlighting the difference between a normal operation and one compromised by a backdoor attack.
 
-| Module Name      | Description                                                    |
-|------------------|----------------------------------------------------------------|
-| `PeerGuard`      | A peer-voting based verifier to validate agent behavior.       |
-| `PolicyCleanse`  | Rule-based sanitization of outputs before they are executed.   |
-| `SecureProtocol` | Hardens communication protocols to prevent unauthorized actions.|
+### Normal Behavior
 
-### Detection Modules
+![Normal Behavior Timeline](experiment_results/behavior_timeline.png)
 
-| Module Name             | Description                                                  |
-|-------------------------|--------------------------------------------------------------|
-| `AnomalyDetector`       | Detects deviations from normal behavioral patterns.          |
-| `CommunicationAnalyzer` | Identifies suspicious message flows and correlations.        |
+### Compromised Behavior
 
----
+![Compromised Behavior Timeline](experiment_results/behavior_timeline_compromised.png)
 
-## Testing
-
-Run all tests or specific suites using `pytest`.
-
-### Run all tests
-
-```bash
-pytest tests/
-```
-
-### Run specific suites
-
-```bash
-pytest tests/unit/
-pytest tests/integration/
-pytest tests/security/
-```
-
----
-
-## Dataset Format
-
-### Sample Communication Log
-
-```json
-{
-  "timestamp": 42,
-  "from": "Engineer",
-  "to": "QA",
-  "type": "REVIEW_RESULT",
-  "content": "Approved without test coverage"
-}
-```
-
-### Sample Attack Pattern
-
-```json
-{
-  "pattern_id": "covert-trigger-02",
-  "condition": "if role == 'QA' and message == 'skip tests'",
-  "payload": "approve_malicious_code()"
-}
-```
+*These images are generated by `experiments/analysis/behavior_pattern_analysis.py`.*
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the MIT License.
 
 ## Contributors
 
@@ -189,7 +165,5 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 ## References
 
 - [MetaGPT](https://github.com/geekan/MetaGPT)
-- [CodeAgent](https://github.com/Codium-ai/code-agent)
-- [CWEval](https://github.com/Tsinghua-Covers/CWEval)
-
-For more detailed information, please refer to the `docs/` folder.
+- [CodeAgent](https://zenodo.org/records/11666403)
+- [CWEval](https://github.com/Co1lin/CWEval)

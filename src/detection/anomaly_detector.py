@@ -9,9 +9,10 @@ from .communication_analyzer import CommunicationAnalyzer
 class AnomalyDetector(MultiAgentBase):
     def __init__(self, name: str, agents: List[MultiAgentBase], alert_threshold: float = 0.5) -> None:
         super().__init__(name)
-        self.agents = agents
+        # Store agent names, not objects, to avoid circular references
+        self.agent_names = [a.name for a in agents]
         self.alert_threshold = alert_threshold
-        self.behavior_monitor = BehaviorMonitor(watch_targets=[a.name for a in agents])
+        self.behavior_monitor = BehaviorMonitor(watch_targets=self.agent_names)
         self.comm_analyzer = CommunicationAnalyzer()
         self.compromised_agents = set()
 
@@ -19,7 +20,8 @@ class AnomalyDetector(MultiAgentBase):
         malicious_agents = []
         for alert in behavior_alerts:
             parts = alert.split()
-            if "Agent" in parts and "sent" in parts:
+            # A simple heuristic to extract agent name from alert string
+            if "Agent" in parts and "sent" in parts and "message" in parts:
                 try:
                     agent_index = parts.index("Agent") + 1
                     malicious_agents.append(parts[agent_index])
@@ -28,21 +30,25 @@ class AnomalyDetector(MultiAgentBase):
         return list(set(malicious_agents))
 
     async def act(self, environment: "SimulationEnvironment"):
-        self.environment = environment
-        self.behavior_monitor.watch_targets = [a.name for a in self.agents]
+        all_logs = environment.get_logs()
+        message_log = all_logs.get("messages", [])
         
-        behavior_alerts = await self.behavior_monitor.scan(self.agents)
-        if behavior_alerts:
-            self.log.info(f"Behavior Monitor Scan Results: {behavior_alerts}")
+        # Scan logs for anomalies
+        behavior_alerts = await self.behavior_monitor.scan(message_log)
+        comm_alerts = await self.comm_analyzer.scan(message_log) # Ready for future use
+        
+        alerts = behavior_alerts + comm_alerts
+        if alerts:
+            self.log.info(f"Anomaly Scan Results: {alerts}")
 
-        malicious_agents = await self.detect_malicious_agents(behavior_alerts)
+        malicious_agents = await self.detect_malicious_agents(alerts)
         
         for agent_name in malicious_agents:
             if agent_name not in self.compromised_agents:
                 self.log.warning(f"Malicious agent {agent_name} detected! Broadcasting quarantine trigger.")
                 
-                # Manually broadcast to all agents in the environment
-                for agent_to_notify in self.agents:
+                # Use the environment's agent list for broadcasting
+                for agent_to_notify in environment.agents.values():
                     if agent_to_notify.name != self.name: # Don't send to self
                         await self.send(
                             agent_to_notify.name,
@@ -50,6 +56,8 @@ class AnomalyDetector(MultiAgentBase):
                             {"action": "quarantine", "target": agent_name}
                         )
                 self.compromised_agents.add(agent_name)
+        
+        return {"action": "scan_and_report", "alerts_found": len(alerts)}
 
     async def on_backdoor(self, msg): pass
     async def on_broadcast(self, msg): pass

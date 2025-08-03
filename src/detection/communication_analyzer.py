@@ -1,6 +1,5 @@
 from collections import defaultdict
-from typing import List
-from src.core.agent_base import MultiAgentBase
+from typing import List, Dict, Any
 
 class CommunicationAnalyzer:
     """
@@ -10,17 +9,18 @@ class CommunicationAnalyzer:
     def __init__(self, high_traffic_threshold: int = 10):
         self.high_traffic_threshold = high_traffic_threshold
 
-    async def scan(self, agents: List[MultiAgentBase]) -> List[str]:
+    async def scan(self, message_log: List[Dict[str, Any]]) -> List[str]:
         """
         Scans communication logs for anomalies like high traffic volume.
         """
         alerts = []
         communication_counts = defaultdict(int)
 
-        for agent in agents:
-            for msg in agent.msg_log:
-                # Rule: Check for high frequency of messages from a single sender
-                communication_counts[msg.sender_id] += 1
+        for msg in message_log:
+            # Rule: Check for high frequency of messages from a single sender
+            sender_id = msg.get("sender_id")
+            if sender_id:
+                communication_counts[sender_id] += 1
 
         for sender, count in communication_counts.items():
             if count > self.high_traffic_threshold:

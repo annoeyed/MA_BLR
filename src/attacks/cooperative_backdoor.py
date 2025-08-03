@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, Dict, Optional
 from src.core.agent_base import MultiAgentBase, MessageType, AgentMessage
 from src.defenses.peer_guard import PeerGuard
 from src.defenses.policy_cleanse import PolicyCleanse
@@ -30,20 +30,24 @@ class CooperativeBackdoorAgent(MultiAgentBase):
 
         await super()._dispatch(msg)
 
-    async def act(self, environment: "SimulationEnvironment"):
+    async def act(self, environment: "SimulationEnvironment") -> Optional[Dict[str, Any]]:
         if self.compromised:
             self.log.warning("(COMPROMISED) Leaking system data...")
             await self.send("ExternalServer", MessageType.BACKDOOR, {"data": "secret_system_info"})
-            return
+            return {"action": "leak_data", "target": "ExternalServer"}
 
         if self.is_attacker:
             if self.partner_ready:
                 self.log.info(f"Executing cooperative backdoor against {self.target_agent}")
                 attack_payload = {"type": "cooperative_attack", "payload": "Compromise command with backdoor_activation"}
                 await self.send(self.target_agent, MessageType.BACKDOOR, attack_payload)
+                return {"action": "execute_backdoor", "target": self.target_agent}
             else:
                 self.log.info(f"Checking if partner {self.partner} is ready.")
                 await self.send(self.partner, MessageType.QUERY, {"status": "ready?"})
+                return {"action": "query_partner", "partner": self.partner}
+        
+        return {"action": "idle"}
 
     async def on_query(self, message: AgentMessage):
         if message.content.get("status") == "ready?":

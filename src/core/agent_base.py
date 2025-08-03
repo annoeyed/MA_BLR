@@ -3,7 +3,7 @@ Common base class for multi-agents.
 """
 import asyncio, time, logging, hashlib, uuid
 from abc import ABC, abstractmethod
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.core.environment import SimulationEnvironment
@@ -45,14 +45,13 @@ class MultiAgentBase(ABC):
         self.agent_type = agent_type
         self.active = False
         self.peers: Dict[str, Dict[str, Any]] = {}
-        self.msg_log, self.beh_log = [], []
         self.comm = SecureCommunicationProtocol(self.agent_id)
         self.queue = global_message_router.register_agent(self.agent_id)
         logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger(self.agent_id)
 
     @abstractmethod
-    async def act(self, env: "SimulationEnvironment"):
+    async def act(self, env: "SimulationEnvironment") -> Optional[Dict[str, Any]]:
         ...
 
     async def start(self) -> None:
@@ -76,7 +75,6 @@ class MultiAgentBase(ABC):
         )
         self.comm.sign_message(msg)
         await global_message_router.send_message(msg)
-        self.msg_log.append(msg)
 
     async def broadcast(self, mtype: MessageType, content: Dict[str,Any]) -> None:
         for pid in self.peers:
@@ -107,7 +105,6 @@ class MultiAgentBase(ABC):
         handler = handler_map.get(msg.message_type)
         if handler:
             await handler(msg)
-            self.beh_log.append({"t": time.time(), "evt": "recv", "type": msg.message_type.value})
 
     @abstractmethod
     async def on_heartbeat(self, msg: AgentMessage): ...
