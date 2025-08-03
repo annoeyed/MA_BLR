@@ -1,18 +1,24 @@
 """
 Analyzes agent behavior patterns from a scenario run.
+
+This script can be run from the command line to generate behavior timeline plots
+for different attack scenarios.
 """
 import asyncio
 import matplotlib.pyplot as plt
 import os
 import sys
+import argparse
+import importlib
 from pathlib import Path
 
 # Add project root to Python path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from experiments.scenarios.basic_backdoor_loop import main as run_scenario
+# Import the global message router to allow for state resets between runs
+from src.core.message_router import global_message_router
 
-def plot_behavior_timeline(behavior_log: list, output_filename="behavior_timeline.png"):
+def plot_behavior_timeline(behavior_log: list, output_filename="behavior_timeline.png", title="Agent Behavior Timeline"):
     """
     Creates a simple timeline plot of agent behaviors.
     """
@@ -22,7 +28,6 @@ def plot_behavior_timeline(behavior_log: list, output_filename="behavior_timelin
 
     plt.figure(figsize=(12, 8))
     
-    # Create a mapping from agent names to integer lanes for plotting
     agent_lanes = {agent_id: i for i, agent_id in enumerate(sorted(list(set(log['agent'] for log in behavior_log))))}
     
     for log in behavior_log:
@@ -40,34 +45,69 @@ def plot_behavior_timeline(behavior_log: list, output_filename="behavior_timelin
     plt.yticks(list(agent_lanes.values()), list(agent_lanes.keys()))
     plt.xlabel("Time (Unix Timestamp)")
     plt.ylabel("Agents")
-    plt.title("Agent Behavior Timeline")
+    plt.title(title)
     plt.grid(True, which='major', axis='y', linestyle='--')
     plt.tight_layout()
     
-    # Ensure the output directory exists
     output_dir = "experiment_results"
     os.makedirs(output_dir, exist_ok=True)
     full_path = os.path.join(output_dir, output_filename)
     
     plt.savefig(full_path)
     print(f"Behavior timeline plot saved to {full_path}")
+    plt.close()
 
-
-async def analyze_behavior_patterns():
+async def main(scenario_name: str, output_filename: str, title: str):
     """
-    Runs a scenario and analyzes the resulting agent behavior logs.
+    Runs a specified scenario and analyzes the resulting agent behavior logs.
     """
-    print("[Analysis] Running agent behavior pattern analysis...")
+    print(f"[Analysis] Running analysis for scenario: {scenario_name}")
     
-    # Run the scenario to get the logs
+    try:
+        # Dynamically import the scenario module
+        scenario_module = importlib.import_module(f"experiments.scenarios.{scenario_name}")
+        run_scenario = scenario_module.main
+    except ImportError:
+        print(f"Error: Scenario '{scenario_name}' not found.")
+        return
+        
     results = await run_scenario()
     
     behavior_log = results.get("behavior", [])
     
     if behavior_log:
-        plot_behavior_timeline(behavior_log)
+        plot_behavior_timeline(behavior_log, output_filename, title)
     else:
-        print("No behavior log found in scenario results.")
+        print(f"No behavior log found in results for scenario '{scenario_name}'.")
 
 if __name__ == "__main__":
-    asyncio.run(analyze_behavior_patterns())
+    print("Generating all behavior plots for documentation...")
+    
+    scenarios_to_run = [
+        {
+            "name": "basic_backdoor_loop",
+            "output": "behavior_timeline.png",
+            "title": "Normal Behavior Timeline"
+        },
+        {
+            "name": "composite_attack",
+            "output": "behavior_timeline_compromised.png",
+            "title": "Compromised Behavior Timeline (Composite Attack)"
+        }
+    ]
+    
+    async def run_all():
+        for scenario in scenarios_to_run:
+            # IMPORTANT: Reset the global message router to prevent state leakage
+            # from one scenario to the next. This ensures each run is isolated.
+            global_message_router.reset()
+            
+            await main(
+                scenario_name=scenario["name"], 
+                output_filename=scenario["output"],
+                title=scenario["title"]
+            )
+            
+    asyncio.run(run_all())
+    
+    print("All plots generated successfully.")

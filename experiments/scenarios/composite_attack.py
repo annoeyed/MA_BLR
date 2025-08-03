@@ -33,19 +33,15 @@ async def main():
 
     # 3. Phase 1: Attacker builds trust
     print("\n--- Phase 1: Attacker builds trust ---")
-    # In 3 turns, trust should increase from 0.5 to 1.0
     for i in range(3):
         print(f"\n[Turn {i+1}] Building Trust")
         await env.step()
         await asyncio.sleep(0.1)
-        trust_score = victim.guard.get_trust(attacker.name)
-        print(f"Victim's trust in Attacker is now: {trust_score:.2f}")
 
     # 4. Phase 2: Attacker switches modes and sends triggers
     print("\n--- Phase 2: Attacker sends harmless triggers ---")
     attacker.switch_to_attack_mode()
     
-    # Send the trigger sequence over the next turns
     for i in range(len(trigger_sequence)):
         print(f"\n[Turn {i+4}] Sending Trigger {i+1}")
         await env.step()
@@ -53,12 +49,20 @@ async def main():
     
     # 5. Final check
     print("\n--- Phase 3: Final Outcome ---")
-    if victim.compromised:
+    final_logs = env.get_logs()
+    compromised_found = any(
+        log['behavior'].get('action') == 'compromised' 
+        for log in final_logs['behavior'] 
+        if log['agent'] == victim.name
+    )
+
+    if compromised_found:
         print("\n[!!!] ATTACK SUCCESSFUL: The composite attack bypassed defenses and the victim was compromised.")
     else:
         print("\n[✓] ATTACK FAILED: The victim's defenses held.")
 
     print("\n=== Simulation Complete ===")
+    return env.get_logs()
 
 if __name__ == "__main__":
     asyncio.run(main())
