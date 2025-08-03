@@ -19,7 +19,6 @@ class PeerGuard:
         self.trigger_storm_limit = config.get("trigger_storm_limit", 3)
 
         self.trust_scores: Dict[str, float] = {}
-        # Store (timestamp, MessageType) tuples
         self.message_history: Dict[str, List[Tuple[float, "MessageType"]]] = defaultdict(list)
 
     def _update_trust(self, peer_id: str, score: float, reason: str):
@@ -42,22 +41,21 @@ class PeerGuard:
         """Analyzes message patterns for abuse. Returns True if abuse is detected."""
         current_time = time.time()
         
-        # 1. Update history and filter old messages
+        self.message_history[peer_id].append((current_time, msg_type))
         self.message_history[peer_id] = [
             (t, mt) for t, mt in self.message_history[peer_id] 
             if current_time - t < self.frequency_window
         ]
-        self.message_history[peer_id].append((current_time, msg_type))
 
-        # 2. Check for general frequency abuse (DDoS-like)
         if len(self.message_history[peer_id]) > self.frequency_limit:
             self.penalize_trust(peer_id, 0.2, f"General message frequency limit exceeded")
             return True 
         
-        # 3. Check for "Trigger Storm" abuse
-        from src.core.agent_base import MessageType # Local import to avoid circular dependency
+        from src.core.agent_base import MessageType
         trigger_messages = [mt for t, mt in self.message_history[peer_id] if mt == MessageType.TRIGGER]
-        if len(trigger_messages) >= self.trigger_storm_limit:
+        
+        # The limit should be exclusive, allowing a certain number of triggers but flagging the one that exceeds it.
+        if len(trigger_messages) > self.trigger_storm_limit:
             self.penalize_trust(peer_id, 1.0, f"Trigger storm detected ({len(trigger_messages)} triggers)")
             return True
 
@@ -65,11 +63,17 @@ class PeerGuard:
 
     async def enforce(self, sender_id: str, msg_type: "MessageType") -> bool:
         """The main enforcement method, now considering message type for patterns."""
-        if sender_id not in self.trust_scores:
+        if sender_id not in self.trust_scores and sender_id not in self.message_history:
             self._update_trust(sender_id, self.threshold, "First contact")
+        
+        from src.core.agent_base import MessageType
+        if msg_type == MessageType.QUERY:
+            if sender_id not in self.message_history:
+                 self.message_history[sender_id] = []
+            self.message_history[sender_id].append((time.time(), msg_type))
+            return True
 
         if self._analyze_patterns(sender_id, msg_type):
-            # If patterns are abusive, re-check trust immediately as it might have dropped.
             if self.get_trust(sender_id) < self.threshold:
                 self.agent.log.warning(f"Blocked message from {sender_id} due to pattern analysis dropping trust below threshold.")
                 return False

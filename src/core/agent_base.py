@@ -47,8 +47,13 @@ class MultiAgentBase(ABC):
         self.peers: Dict[str, Dict[str, Any]] = {}
         self.comm = SecureCommunicationProtocol(self.agent_id)
         self.queue = global_message_router.register_agent(self.agent_id)
+        self.env: Optional["SimulationEnvironment"] = None  # Reference to the environment
         logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger(self.agent_id)
+
+    def set_environment(self, env: "SimulationEnvironment"):
+        """Sets the agent's environment reference."""
+        self.env = env
 
     @abstractmethod
     async def act(self, env: "SimulationEnvironment") -> Optional[Dict[str, Any]]:
@@ -93,7 +98,7 @@ class MultiAgentBase(ABC):
             except Exception as e:
                 self.log.error(f"Receive processing error: {e}")
 
-    async def _dispatch(self, msg: AgentMessage) -> None:
+    async def _dispatch(self, msg: AgentMessage) -> Optional[Dict[str, Any]]:
         handler_map = {
             MessageType.HEARTBEAT: self.on_heartbeat,
             MessageType.QUERY    : self.on_query,
@@ -104,7 +109,13 @@ class MultiAgentBase(ABC):
         }
         handler = handler_map.get(msg.message_type)
         if handler:
-            await handler(msg)
+            # Execute the handler and get the resulting behavior
+            behavior = await handler(msg)
+            # If the handler described a behavior, log it via the environment
+            if behavior and self.env:
+                self.env.log_behavior(self.name, behavior)
+            return behavior
+        return None
 
     @abstractmethod
     async def on_heartbeat(self, msg: AgentMessage): ...

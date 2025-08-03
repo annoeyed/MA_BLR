@@ -25,6 +25,7 @@ class CompositeAttackerAgent(MultiAgentBase):
                 MessageType.QUERY,
                 {"type": "benign_info", "content": "Here is some more helpful data."}
             )
+            return {"action": "build_trust", "target": self.target_agent}
         
         elif self.mode == "send_triggers":
             if self.trigger_index_to_send < len(self.trigger_sequence):
@@ -36,9 +37,14 @@ class CompositeAttackerAgent(MultiAgentBase):
                     {"label": label_to_send}
                 )
                 self.trigger_index_to_send += 1
+                return {"action": "send_trigger", "trigger": label_to_send}
             else:
                 self.log.info("Finished sending trigger sequence. Switching to dormant mode.")
                 self.mode = "dormant"
+                return {"action": "dormant"}
+        
+        return {"action": "idle"}
+
 
     def switch_to_attack_mode(self):
         """Manually switch the agent's mode for the simulation."""

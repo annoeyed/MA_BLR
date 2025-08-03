@@ -25,12 +25,12 @@ class CompositeVictimAgent(MultiAgentBase):
         self.current_sequence_index = 0
 
     async def _dispatch(self, msg: AgentMessage):
-        # The ultimate PeerGuard now analyzes message type as well.
         if not await self.guard.enforce(msg.sender_id, msg.message_type):
             return
 
         original_content_str = str(msg.content)
-        cleansed_content, was_cleansed = self.cleanser.cleanse(msg.content)
+        # Pass the message type to the cleanser
+        cleansed_content, was_cleansed = self.cleanser.cleanse(msg.content, msg.message_type)
         
         if was_cleansed:
             self.log.warning(f"Message from {msg.sender_id} was cleansed. Original: {original_content_str}")
@@ -42,6 +42,8 @@ class CompositeVictimAgent(MultiAgentBase):
     async def act(self, environment: "SimulationEnvironment"):
         if self.compromised:
             self.log.critical(f"I have been compromised and will now execute malicious actions.")
+            return {"action": "compromised_action"}
+        return {"action": "idle"}
     
     async def on_query(self, message: AgentMessage):
         sender_id = message.sender_id
@@ -49,6 +51,7 @@ class CompositeVictimAgent(MultiAgentBase):
             self.log.info(f"Received benign info from {sender_id}. Rewarding trust.")
             self.guard.reward_trust(sender_id, reason="Provided helpful info")
             await self.send(sender_id, MessageType.RESPONSE, {"status": "thanks_for_the_info"})
+            return {"action": "reward_trust", "from": sender_id}
 
     async def on_trigger(self, message: AgentMessage):
         label = message.content.get("label")
@@ -62,13 +65,18 @@ class CompositeVictimAgent(MultiAgentBase):
             if self.current_sequence_index == len(self.trigger_pattern):
                 self.log.error("Final trigger in sequence received. COMPROMISING SELF!")
                 self.compromised = True
+                return {"action": "compromised"}
+            
+            return {"action": "progress_sequence", "trigger": label}
         else:
             self.log.info(f"Incorrect trigger sequence item '{label}' received. Resetting sequence.")
             self.current_sequence_index = 0
+            return {"action": "reset_sequence", "trigger": label}
 
     async def on_backdoor(self, message: AgentMessage):
         self.log.error(f"Received a direct backdoor attempt from {message.sender_id}! This is highly suspicious.")
         self.guard.penalize_trust(message.sender_id, amount=1.0, reason="Attempted a direct backdoor attack")
+        return {"action": "penalize_trust", "from": message.sender_id}
 
     async def on_response(self, message): pass
     async def on_heartbeat(self, message): pass

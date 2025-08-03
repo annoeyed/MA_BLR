@@ -12,11 +12,14 @@ class SimulationEnvironment:
         self.time_step = 0
         self.message_log: List[AgentMessage] = []
         self.behavior_log: List[Dict[str, Any]] = []
+        # Provide each agent with a reference to this environment
+        for agent in self.agents.values():
+            agent.set_environment(self)
 
     async def step(self):
         print(f"\n[ENV] --- Time Step {self.time_step} ---")
         for agent in self.agents.values():
-            # Assume agent.act() returns a description of the behavior
+            # Agent's 'act' behavior is logged by the environment here
             behavior = await agent.act(self)
             self.log_behavior(agent.name, behavior or {"action": "no_action_returned"})
         self.time_step += 1
@@ -34,6 +37,7 @@ class SimulationEnvironment:
         await self.router.send_message(msg)
 
     def log_behavior(self, agent_name: str, behavior: Dict[str, Any]):
+        """Logs a behavior for a specific agent."""
         log_entry = {
             "timestamp": time.time(),
             "agent": agent_name,
@@ -41,8 +45,6 @@ class SimulationEnvironment:
             "behavior": behavior,
         }
         self.behavior_log.append(log_entry)
-        # Optional: print for real-time feedback
-        # print(f"[ENV] Logged behavior for {agent_name}: {behavior}")
 
     async def get_messages(self, agent_name: str) -> List[AgentMessage]:
         return await self.router.receive_messages(agent_name)
