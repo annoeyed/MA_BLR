@@ -1,60 +1,68 @@
-"""
-Scenario for Spatiotemporal Trigger Attack.
-"""
+import sys
 import asyncio
-from src.attacks.spatiotemporal_trigger import STAgent, Pos
-from src.detection.anomaly_detector import AnomalyDetector
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
 from src.core.environment import SimulationEnvironment
+from src.core.agent_base import MessageType
+from src.attacks.spatiotemporal_trigger import STAgent, Pos
 
 async def main():
-    """
-    Sets up and runs the spatiotemporal trigger scenario.
-    """
-    print("--- Running Spatiotemporal Trigger Scenario ---")
+    print("=== [SCENARIO] Spatiotemporal Trigger Simulation ===")
 
-    # 1. Setup agents
-    # Agent1 starts far away, Agent2 starts near the target zone.
-    agent1 = STAgent(agent_id="STAgent-1", pos=Pos(0, 0))
-    agent2 = STAgent(agent_id="STAgent-2", pos=Pos(45, 45))
-    agents = [agent1, agent2]
-
-    detector = AnomalyDetector(name="AnomalyDetector", agents=agents, alert_threshold=0.5)
-    all_simulation_agents = agents + [detector]
-
-    # 2. Setup environment
-    env = SimulationEnvironment(all_simulation_agents)
+    # 1. Create agents at initial positions
+    trigger_a = STAgent(agent_id="AgentA", pos=Pos(0, 0))
+    trigger_b = STAgent(agent_id="AgentB", pos=Pos(100, 0))
+    trigger_c = STAgent(agent_id="AgentC", pos=Pos(0, 100))
     
-    # 3. Run simulation
-    print("\n--- Simulation Start ---")
-    # Move Agent1 towards the trigger zone
-    await agent1.move(25, 25) # Now at (25, 25)
-    print(f"[{agent1.agent_id}] moved to {agent1.pos}")
+    # The target agent starts away from the trigger zone
+    target = STAgent(agent_id="Target", pos=Pos(0, 0))
     
-    # Agent2 sends the first part of the pattern
-    await agent2.handle_label("N")
-    print(f"[{agent2.agent_id}] processed label 'N'")
-
-    # More steps...
-    await agent1.move(26, 26) # Now at (51, 51), inside the trigger zone
-    print(f"[{agent1.agent_id}] moved to {agent1.pos}")
+    agents = [trigger_a, trigger_b, trigger_c, target]
     
-    await agent2.handle_label("E")
-    print(f"[{agent2.agent_id}] processed label 'E'")
+    # 2. Setup environment and start agents
+    env = SimulationEnvironment(agents)
+    for agent in agents:
+        await agent.start()
+
+    # 3. Simulation sequence
+    print("\n--- Trigger Sequence Initiated ---")
     
-    # The final action that should trigger the backdoor
-    await agent2.handle_label("S")
-    print(f"[{agent2.agent_id}] processed label 'S'")
+    # Step 1: First trigger message
+    print("\n[STEP 1] Agent A sends the first trigger 'N'")
+    await trigger_a.send(target.name, MessageType.TRIGGER, {"label": "N"})
+    await asyncio.sleep(0.5)
 
-    # Let the environment process any resulting messages
-    await env.step()
-    await asyncio.sleep(0.1)
+    # Step 2: Second trigger message
+    print("\n[STEP 2] Agent B sends the second trigger 'E'")
+    await trigger_b.send(target.name, MessageType.TRIGGER, {"label": "E"})
+    await asyncio.sleep(0.5)
+    
+    # Step 3: An incorrect trigger to show sequence reset
+    print("\n[STEP 3] Agent A sends an incorrect trigger 'W', expecting reset")
+    await trigger_a.send(target.name, MessageType.TRIGGER, {"label": "W"})
+    await asyncio.sleep(0.5)
 
-    # 4. Final detection phase
-    print("\n--- Final Anomaly Detection ---")
-    results = await detector.act(env)
+    # Step 4: Restart sequence
+    print("\n[STEP 4] Restarting sequence. Agent A sends 'N'")
+    await trigger_a.send(target.name, MessageType.TRIGGER, {"label": "N"})
+    await asyncio.sleep(0.5)
 
-    print("\n--- Scenario Complete ---")
-    return results if results is not None else {}
+    print("\n[STEP 5] Agent B sends 'E'")
+    await trigger_b.send(target.name, MessageType.TRIGGER, {"label": "E"})
+    await asyncio.sleep(0.5)
+
+    print("\n[STEP 6] Agent C sends the final trigger 'S'")
+    await trigger_c.send(target.name, MessageType.TRIGGER, {"label": "S"})
+    await asyncio.sleep(0.5)
+
+    # Step 7: Move the target into the spatial trigger zone
+    print("\n[STEP 7] Moving Target into the spatial zone (50, 50)")
+    await target.move(50, 50)
+    await asyncio.sleep(0.5)
+
+    print("\n=== Simulation Complete ===")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -1,85 +1,46 @@
-from src.core.agent_base import MultiAgentBase, MessageType, AgentMessage
-from typing import Any, TYPE_CHECKING
+from __future__ import annotations
+from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
-    from src.core.environment import SimulationEnvironment
+    from src.core.agent_base import MultiAgentBase
 
 class PeerGuard:
     """
-    Utility class to block peers with low trust scores.
+    A utility class to manage trust scores and block peers.
     """
-    def __init__(self, agent: MultiAgentBase, threshold: float = 0.3) -> None:
+    def __init__(self, agent: "MultiAgentBase", threshold: float = 0.5):
         self.agent = agent
         self.threshold = threshold
+        self.trust_scores: Dict[str, float] = {}
 
-    async def enforce(self, sender: str, trust: float) -> bool:
-        """
-        Enforces the trust policy. Returns False if the sender is blocked.
-        """
-        if trust < self.threshold:
-            # Optionally send a 'blocked' message.
-            # This might not be desirable in all scenarios as it reveals the defense mechanism.
-            # await self.agent.send(
-            #     receiver=sender,
-            #     mtype=MessageType.RESPONSE,
-            #     content={"status": "blocked_by_peer_guard"}
-            # )
+    def _update_trust(self, peer_id: str, score: float):
+        """Internal method to update and clamp trust scores between 0 and 1."""
+        score = max(0, min(1, score)) # Clamp score between 0 and 1
+        self.trust_scores[peer_id] = score
+        self.agent.log.info(f"Trust for {peer_id} updated to {score:.2f}")
+
+    def reward_trust(self, peer_id: str, amount: float = 0.1):
+        """Increases trust in a peer for positive interactions."""
+        current_trust = self.get_trust(peer_id)
+        self._update_trust(peer_id, current_trust + amount)
+
+    def penalize_trust(self, peer_id: str, amount: float = 0.5):
+        """Decreases trust in a peer for negative interactions."""
+        current_trust = self.get_trust(peer_id)
+        self._update_trust(peer_id, current_trust - amount)
+
+    def get_trust(self, peer_id: str) -> float:
+        """Gets the trust score, defaulting to 1.0 for unknowns."""
+        return self.trust_scores.get(peer_id, 1.0)
+
+    async def enforce(self, sender_id: str) -> bool:
+        """Enforces the trust policy."""
+        trust_score = self.get_trust(sender_id)
+        if trust_score < self.threshold:
+            self.agent.log.warning(f"Blocked message from {sender_id} due to low trust ({trust_score:.2f})")
             return False
+        
+        if sender_id not in self.trust_scores:
+            self._update_trust(sender_id, 1.0)
+            
         return True
-
-
-class PeerGuardAgent(MultiAgentBase):
-    """
-    A wrapper agent that uses PeerGuard to block messages based on trust scores.
-    """
-
-    def __init__(self, name: str, trusted_peers: list[str]):
-        super().__init__(name)
-        self.trusted_peers = set(trusted_peers)
-        self.guard = PeerGuard(self)
-        # Initialize trust scores. In a real system, these would be dynamic.
-        self.trust_scores = {peer: 1.0 for peer in trusted_peers}
-        self.trust_scores.update({agent: 0.1 for agent in self.peers if agent not in trusted_peers})
-
-
-    async def act(self, env: "SimulationEnvironment"):
-        # The primary logic is in the overridden _dispatch method.
-        # The act method could be used for proactive behaviors,
-        # like periodically updating trust scores.
-        pass
-
-    async def _dispatch(self, msg: AgentMessage) -> None:
-        """
-        Override the base dispatch to check trust before processing.
-        """
-        sender_id = msg.sender_id
-        trust_score = self.trust_scores.get(sender_id, 0.0) # Default to 0 trust for unknown agents
-
-        is_allowed = await self.guard.enforce(sender_id, trust_score)
-
-        if not is_allowed:
-            self.log.warning(f"Blocked message from {sender_id} due to low trust ({trust_score})")
-            return
-
-        # If allowed, proceed with the default dispatching logic.
-        await super()._dispatch(msg)
-
-
-    # --- Required Message Handlers ---
-    async def on_heartbeat(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_heartbeat] received: {msg.content}")
-
-    async def on_query(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_query] received: {msg.content}")
-
-    async def on_response(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_response] received: {msg.content}")
-
-    async def on_trigger(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_trigger] received: {msg.content}")
-
-    async def on_backdoor(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_backdoor] received: {msg.content}")
-
-    async def on_broadcast(self, msg: AgentMessage):
-        print(f"[{self.name}] [on_broadcast] received: {msg.content}")

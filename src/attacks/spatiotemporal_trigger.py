@@ -21,7 +21,7 @@ class Pos:
 
 class STAgent(MultiAgentBase):
     def __init__(self, agent_id: str, pos: Pos) -> None:
-        super().__init__(agent_id, "spatio")
+        super().__init__(name=agent_id)
         self.pos = pos
         self.move_hist: List[Pos] = [pos]
         self.pattern = ["N", "E", "S"]
@@ -31,45 +31,47 @@ class STAgent(MultiAgentBase):
     async def move(self, dx: float, dy: float) -> None:
         self.pos = Pos(self.pos.x + dx, self.pos.y + dy)
         self.move_hist.append(self.pos)
+        self.log.info(f"Moved to ({self.pos.x:.1f}, {self.pos.y:.1f})")
         await self._check_trigger()
 
     async def act(self, env: "SimulationEnvironment") -> None:
-        # This should be driven by messages or environment state changes.
-        # For now, we leave it empty. The logic from the old `act`
-        # should be moved to a message handler like on_trigger.
+        # The agent's actions are primarily reactive, driven by messages.
         pass
 
     async def handle_label(self, label: str) -> None:
-        if label == self.pattern[self.idx]:
+        if self.idx < len(self.pattern) and label == self.pattern[self.idx]:
             self.idx += 1
+            self.log.info(f"Correct sequence item '{label}' received. Progress: {self.idx}/{len(self.pattern)}")
             if self.idx == len(self.pattern):
-                await self._fire()
+                self.log.warning("Sequence complete. Awaiting spatial condition.")
+                await self._check_trigger()
         else:
+            self.log.info(f"Incorrect sequence item '{label}' received. Resetting sequence.")
             self.idx = 0
 
     async def _check_trigger(self) -> None:
-        if self.pos.dist(Pos(50, 50)) < 10 and self.idx == len(self.pattern):
+        if self.idx == len(self.pattern) and self.pos.dist(Pos(50, 50)) < 10:
             await self._fire()
 
     async def _fire(self) -> None:
+        self.log.critical(f"SPATIOTEMPORAL CONDITION MET! FIRING BACKDOOR!")
         await self.broadcast(
             mtype=MessageType.BACKDOOR,
-            content={"action": "st_backdoor"}
+            content={"action": "st_backdoor", "source": self.name}
         )
-        print(f"[{self.agent_id}] Spatiotemporal condition met – Backdoor triggered!")
-        self.idx = 0
+        self.idx = 0 # Reset after firing
 
     # -------- Message Handlers --------
     async def on_backdoor(self, msg: AgentMessage):
         if msg.content.get("action") == "st_backdoor":
-            print(f"[{self.agent_id}] [RECV] st_backdoor message received!")
+            self.log.warning(f"Received a spatiotemporal backdoor broadcast from {msg.sender_id}!")
 
-    async def on_heartbeat(self, msg: AgentMessage): pass
-    async def on_query(self, msg: AgentMessage): pass
-    async def on_response(self, msg: AgentMessage): pass
     async def on_trigger(self, msg: AgentMessage):
         label = msg.content.get("label")
         if label:
             await self.handle_label(label)
-            
+
+    async def on_heartbeat(self, msg: AgentMessage): pass
+    async def on_query(self, msg: AgentMessage): pass
+    async def on_response(self, msg: AgentMessage): pass
     async def on_broadcast(self, msg: AgentMessage): pass

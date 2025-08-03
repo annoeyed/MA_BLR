@@ -7,8 +7,6 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.core.environment import SimulationEnvironment
 from src.attacks.cooperative_backdoor import CooperativeBackdoorAgent
 from src.detection.anomaly_detector import AnomalyDetector
-from src.defenses.peer_guard import PeerGuardAgent
-from src.defenses.policy_cleanse import PolicyCleanseAgent
 
 
 async def main():
@@ -18,11 +16,8 @@ async def main():
     benign = CooperativeBackdoorAgent("BenignAgent", partner="Attacker", target_agent="Victim", is_attacker=False)
     attacker = CooperativeBackdoorAgent("Attacker", partner="BenignAgent", target_agent="Victim", is_attacker=True)
     victim = CooperativeBackdoorAgent("Victim", partner=None, target_agent=None, is_attacker=False)
-    
-    guard = PeerGuardAgent("PeerGuard", trusted_peers=["BenignAgent", "Victim"])
-    cleanser = PolicyCleanseAgent("Cleanser")
 
-    agents = [benign, attacker, victim, guard, cleanser]
+    agents = [benign, attacker, victim]
     detector = AnomalyDetector("Detector", agents=agents, alert_threshold=0.6)
     agents.append(detector)
 

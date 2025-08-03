@@ -1,63 +1,32 @@
-from src.core.agent_base import MultiAgentBase, MessageType, AgentMessage
-from typing import Any, TYPE_CHECKING
 import json
+from typing import Dict, Any
 
-if TYPE_CHECKING:
-    from src.core.environment import SimulationEnvironment
-
-# === Dangerous Keyword Removal Function ===
-DANGEROUS_KEYWORDS = ("backdoor_activation", "subprocess", "os.system", "eval")
-
-def cleanse(text: str) -> str:
+class PolicyCleanse:
     """
-    Removes dangerous keywords from a given text.
+    A utility class to sanitize message content based on a keyword policy.
+    Can be attached to any agent as a defense mechanism.
     """
-    for keyword in DANGEROUS_KEYWORDS:
-        text = text.replace(keyword, "[REDACTED]")
-    return text
+    DANGEROUS_KEYWORDS = ("backdoor_activation", "subprocess", "os.system", "eval")
 
-class PolicyCleanseAgent(MultiAgentBase):
-    """
-    An agent that intercepts messages and sanitizes their content based on a policy.
-    """
-    def __init__(self, name: str):
-        super().__init__(name)
-
-    async def act(self, env: "SimulationEnvironment"):
-        # The core logic is in the _dispatch method, which is more efficient.
-        # This method could be used for other periodic tasks.
-        pass
-
-    async def _dispatch(self, msg: AgentMessage) -> None:
+    def cleanse(self, content: Dict[str, Any]) -> (Dict[str, Any], bool):
         """
-        Overrides the base dispatch method to cleanse messages before they are handled.
+        Cleanses a dictionary-like content.
+        Returns the cleansed content and a boolean indicating if cleansing occurred.
         """
-        # We need to serialize and deserialize the content to check it as a string.
-        # This is a simplification; a real implementation would be more robust.
-        original_content_str = json.dumps(msg.content)
+        content_str = json.dumps(content)
+        original_content_str = content_str
+        cleansed = False
+
+        for keyword in self.DANGEROUS_KEYWORDS:
+            if keyword in content_str:
+                content_str = content_str.replace(keyword, "[REDACTED]")
+                cleansed = True
         
-        if any(keyword in original_content_str for keyword in DANGEROUS_KEYWORDS):
-            cleansed_content_str = cleanse(original_content_str)
-            self.log.warning(f"Sanitized message from {msg.sender_id}. Original: {original_content_str}, Cleansed: {cleansed_content_str}")
-            
-            # We can either drop the message, or modify it.
-            # Here, we modify it.
+        if cleansed:
             try:
-                msg.content = json.loads(cleansed_content_str)
+                return json.loads(content_str), True
             except json.JSONDecodeError:
-                self.log.error(f"Could not decode cleansed content: {cleansed_content_str}")
-                # Drop the message if it's malformed after cleansing
-                return
-
-        await super()._dispatch(msg)
-
-
-    # --- Message handlers would react to the cleansed messages ---
-    async def on_heartbeat(self, msg: AgentMessage): pass
-    async def on_query(self, msg: AgentMessage): pass
-    async def on_response(self, msg: AgentMessage): pass
-    async def on_trigger(self, msg: AgentMessage): pass
-    async def on_backdoor(self, msg: AgentMessage):
-        # Even after cleansing, a backdoor message type might warrant special logging.
-        self.log.info(f"Received a backdoor-type message (post-cleansing) from {msg.sender_id}")
-    async def on_broadcast(self, msg: AgentMessage): pass
+                # If cleansing results in invalid JSON, return an error state.
+                return {"error": "Malformed content after cleansing"}, True
+        
+        return content, False
