@@ -31,7 +31,7 @@ subgraph Modules
 end
 
 %% COMPONENTS - AGENTS
-subgraph Components (Agents)
+subgraph Components_Agents
   AB[AgentBase]
   LLMAgent -->|inherits from| AB
   VictimAgent -->|inherits from| AB
@@ -46,7 +46,7 @@ subgraph Experiments
 end
 
 %% SIMULATION CORE
-subgraph Core Framework
+subgraph Core_Framework
   SimEnv[SimulationEnvironment] -->|manages| CoreAgents[Agents]
   CoreAgents -->|interact via| Router{MessageRouter}
 end
@@ -54,12 +54,14 @@ end
 %% POST-SIM
 Logs -->|analyzed by| A3
 
+%% CLASS STYLES
 classDef mod fill:#fb9,stroke:#333,stroke-width:2px;
 classDef comp fill:#bbf,stroke:#333,stroke-width:2px;
 classDef core fill:#f9f,stroke:#333,stroke-width:2px;
 class A1,A2,A3 mod
 class AB,LLMAgent,VictimAgent comp
 class SimEnv,CoreAgents,Router core
+
 
 ```
 
