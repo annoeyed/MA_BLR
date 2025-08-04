@@ -21,51 +21,40 @@ This framework allows researchers to model and evaluate complex attack scenarios
 The framework is designed with a modular architecture, separating the core simulation logic from the specific implementations of agents, attacks, and defenses.
 
 ```mermaid
-graph TD
+flowchart TB
 
-%% COMPONENTS
-subgraph Components_Agents
-  LLMAgent[LLMAgent]
-  VictimAgent[VictimAgent]
-  AB[AgentBase]
-  LLMAgent -->|inherits from| AB
-  VictimAgent -->|inherits from| AB
-end
+    %% ===== 그룹: Experiments =====
+    subgraph EXP[Experiments]
+        Experiments[Experiments]
+    end
 
-%% MODULES
-subgraph Modules
-  Attacks[Attacks]
-  Defenses[Defenses]
-  Detection[Detection]
-end
+    %% ===== 그룹: Core Framework (1) =====
+    subgraph CORE1["Core Framework (1)"]
+        Router[Router]
+        CoreLogic[Core Logic]
+        Logs[Logs]
+    end
 
-Attacks -->|targets| AB
-AB -->|uses| Defenses
+    %% ===== 그룹: Components (Agents) =====
+    subgraph AGENTS["Components (Agents)"]
+        LLM[LLM]
+        Victim[Victim]
+        AgentBase[AgentBase]
+    end
 
-%% EXPERIMENTS
-subgraph Experiments
-  Scenario[Scenario Scripts]
-  Analysis[Analysis Scripts]
-  Scenario --> SimEnv[SimulationEnvironment]
-  Analysis --> Logs[Logs]
-end
+    %% ===== 그룹: Modules =====
+    subgraph MODS[Modules]
+        Defenses[Defenses]
+        Analysis[Analysis]
+    end
 
-%% POST SIMULATION
-Logs -->|analyzed by| Detection
-
-%% CORE
-subgraph Core_Framework
-  SimEnv -->|manages| CoreAgents[Agents]
-  CoreAgents -->|interact via| Router{MessageRouter}
-end
-
-%% CLASS STYLES
-classDef mod fill:#fb9,stroke:#333,stroke-width:2px
-classDef comp fill:#bbf,stroke:#333,stroke-width:2px
-classDef core fill:#f9f,stroke:#333,stroke-width:2px
-class Attacks,Defenses,Detection mod
-class AB,LLMAgent,VictimAgent comp
-class SimEnv,CoreAgents,Router core
+    %% ===== 관계선 =====
+    Experiments -->|runs| Router
+    LLM -->|interact| Router
+    Victim -->|inherits| Logs
+    AgentBase -->|uses| CoreLogic
+    CoreLogic -->|uses| Defenses
+    Logs -->|analyzed| Analysis
 
 
 
