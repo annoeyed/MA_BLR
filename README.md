@@ -69,6 +69,7 @@ class SimEnv,CoreAgents,Router core
 
 
 
+
 ```
 
 - **Core Framework**: Manages the simulation lifecycle and communication.
