@@ -22,42 +22,45 @@ The framework is designed with a modular architecture, separating the core simul
 
 ```mermaid
 graph TD;
-    subgraph Experiments
-        E1[Scenario Scripts] --> A;
-        E2[Analysis Scripts] --> D;
-    end
 
-    subgraph Core Framework
-        A[SimulationEnvironment] -->|Manages| B(Agents);
-        B -->|Interact via| C{MessageRouter};
-    end
+%% MODULES
+subgraph Modules
+  A1[Attacks]
+  A2[Defenses]
+  A3[Detection]
+end
 
-    subgraph Components
-        subgraph Agents
-            LLMAgent -- Inherits from --- AgentBase;
-            VictimAgent -- Inherits from --- AgentBase;
-        end
-        AgentBase -- Uses ---> Defenses;
-        AgentBase -- Is targeted by ---> Attacks;
-    end
-    
-    subgraph Post-Simulation
-       D[Log Files] -->|Analyzed by| Detection;
-    end
+%% COMPONENTS - AGENTS
+subgraph Components (Agents)
+  AB[AgentBase]
+  LLMAgent -->|inherits from| AB
+  VictimAgent -->|inherits from| AB
+end
+AB -->|uses| A2
+A1 -->|targets| AB
 
-    subgraph Modules
-        Attacks;
-        Defenses;
-        Detection;
-    end
+%% EXPERIMENTS
+subgraph Experiments
+  Script1[Scenario Scripts] --> SimEnv
+  Script2[Analysis Scripts] --> Logs
+end
 
-    classDef core fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef component fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef module fill:#fb9,stroke:#333,stroke-width:2px;
-    
-    class A,B,C core;
-    class AgentBase,LLMAgent,VictimAgent component;
-    class Attacks,Defenses,Detection module;
+%% SIMULATION CORE
+subgraph Core Framework
+  SimEnv[SimulationEnvironment] -->|manages| CoreAgents[Agents]
+  CoreAgents -->|interact via| Router{MessageRouter}
+end
+
+%% POST-SIM
+Logs -->|analyzed by| A3
+
+classDef mod fill:#fb9,stroke:#333,stroke-width:2px;
+classDef comp fill:#bbf,stroke:#333,stroke-width:2px;
+classDef core fill:#f9f,stroke:#333,stroke-width:2px;
+class A1,A2,A3 mod
+class AB,LLMAgent,VictimAgent comp
+class SimEnv,CoreAgents,Router core
+
 ```
 
 - **Core Framework**: Manages the simulation lifecycle and communication.
