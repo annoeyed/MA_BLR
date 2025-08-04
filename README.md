@@ -21,46 +21,52 @@ This framework allows researchers to model and evaluate complex attack scenarios
 The framework is designed with a modular architecture, separating the core simulation logic from the specific implementations of agents, attacks, and defenses.
 
 ```mermaid
-graph TD;
+graph TD
 
-%% MODULES
-subgraph Modules
-  A1[Attacks]
-  A2[Defenses]
-  A3[Detection]
-end
-
-%% COMPONENTS - AGENTS
+%% COMPONENTS
 subgraph Components_Agents
+  LLMAgent[LLMAgent]
+  VictimAgent[VictimAgent]
   AB[AgentBase]
   LLMAgent -->|inherits from| AB
   VictimAgent -->|inherits from| AB
 end
-AB -->|uses| A2
-A1 -->|targets| AB
+
+%% MODULES
+subgraph Modules
+  Attacks[Attacks]
+  Defenses[Defenses]
+  Detection[Detection]
+end
+
+Attacks -->|targets| AB
+AB -->|uses| Defenses
 
 %% EXPERIMENTS
 subgraph Experiments
-  Script1[Scenario Scripts] --> SimEnv
-  Script2[Analysis Scripts] --> Logs
+  Scenario[Scenario Scripts]
+  Analysis[Analysis Scripts]
+  Scenario --> SimEnv[SimulationEnvironment]
+  Analysis --> Logs[Logs]
 end
 
-%% SIMULATION CORE
+%% POST SIMULATION
+Logs -->|analyzed by| Detection
+
+%% CORE
 subgraph Core_Framework
-  SimEnv[SimulationEnvironment] -->|manages| CoreAgents[Agents]
+  SimEnv -->|manages| CoreAgents[Agents]
   CoreAgents -->|interact via| Router{MessageRouter}
 end
 
-%% POST-SIM
-Logs -->|analyzed by| A3
-
 %% CLASS STYLES
-classDef mod fill:#fb9,stroke:#333,stroke-width:2px;
-classDef comp fill:#bbf,stroke:#333,stroke-width:2px;
-classDef core fill:#f9f,stroke:#333,stroke-width:2px;
-class A1,A2,A3 mod
+classDef mod fill:#fb9,stroke:#333,stroke-width:2px
+classDef comp fill:#bbf,stroke:#333,stroke-width:2px
+classDef core fill:#f9f,stroke:#333,stroke-width:2px
+class Attacks,Defenses,Detection mod
 class AB,LLMAgent,VictimAgent comp
 class SimEnv,CoreAgents,Router core
+
 
 
 ```
